@@ -31,7 +31,7 @@
             this.InstructionsLabel = new System.Windows.Forms.Label();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.CheckButton = new System.Windows.Forms.Button();
-            this.NotesTextBox = new System.Windows.Forms.TextBox();
+            this.NotesTextBox = new System.Windows.Forms.RichTextBox();
             this.tableLayoutPanel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -77,12 +77,14 @@
             // NotesTextBox
             // 
             this.NotesTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.NotesTextBox.Location = new System.Drawing.Point(84, 5);
-            this.NotesTextBox.Margin = new System.Windows.Forms.Padding(3, 5, 3, 3);
+            this.NotesTextBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.NotesTextBox.Location = new System.Drawing.Point(84, 3);
+            this.NotesTextBox.Multiline = false;
             this.NotesTextBox.Name = "NotesTextBox";
             this.NotesTextBox.ReadOnly = true;
-            this.NotesTextBox.Size = new System.Drawing.Size(713, 20);
+            this.NotesTextBox.Size = new System.Drawing.Size(713, 24);
             this.NotesTextBox.TabIndex = 1;
+            this.NotesTextBox.Text = "";
             this.NotesTextBox.TextChanged += new System.EventHandler(this.NotesTextBox_TextChanged);
             this.NotesTextBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.NotesTextBox_KeyDown);
             // 
@@ -105,7 +107,6 @@
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.KenKenPlayer_DragDrop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.KenKenPlayer_DragEnter);
             this.tableLayoutPanel1.ResumeLayout(false);
-            this.tableLayoutPanel1.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -114,7 +115,7 @@
         private System.Windows.Forms.Label InstructionsLabel;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Button CheckButton;
-        private System.Windows.Forms.TextBox NotesTextBox;
+        private System.Windows.Forms.RichTextBox NotesTextBox;
     }
 }
 

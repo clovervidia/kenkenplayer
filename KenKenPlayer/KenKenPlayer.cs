@@ -28,6 +28,7 @@ namespace KenKenPlayer
         private int borderWidth = 5;                            // Width of the outer border lines and heavy cage lines.
         private int gridWidth = 1;                              // Width of the grid lines.
         private Color puzzleBackgroundColor = Color.Black;      // Background color of the puzzle canvas.
+        private Color foregroundColor = Color.White;            // Color used for most text elements.
         private Font cornerTextFont = new Font("Arial", 20);    // Font used for the corner text with the result and operation.
         private Brush cornerTextColor = Brushes.White;          // Color used for the corner text.
         private Bitmap puzzleCanvas;                            // Bitmap for the puzzle canvas.
@@ -35,7 +36,6 @@ namespace KenKenPlayer
         private Font textBoxFont = new Font("Arial", 36);       // Font used for the cell textboxes.
         private Color textBoxIncorrectColor = Color.Red;        // Color used to show incorrect cells.
         private TextBox focusedTextBox;                         // Used to track the currently focused textbox so the notes textbox knows where to store its text.
-        private Font notesLabelFont = new Font("Arial", 10);    // Font used for the labels at the bottom of each cell that shows the cell's notes.
         private DateTime startTime;                             // Records the time at which the puzzle has finished loading from the text file and was rendered in the program.
         private bool puzzleCompleted;                           // Indicates whether the puzzle has been completed yet or not. Used for displaying the completion time in the title bar.
 
@@ -418,7 +418,7 @@ namespace KenKenPlayer
                 textBox.GotFocus -= CellTextBox_GotFocus;
                 textBox.KeyDown -= CellTextBox_KeyDown;
                 Controls.Remove(textBox);
-                Controls.Remove(((TextBoxTagData)textBox.Tag).notesLabel);
+                Controls.Remove(((TextBoxTagData)textBox.Tag).notesPreview);
                 textBox.Dispose();
             }
         }
@@ -436,7 +436,7 @@ namespace KenKenPlayer
                         BackColor = puzzleBackgroundColor,
                         BorderStyle = BorderStyle.None,
                         Font = textBoxFont,
-                        ForeColor = Color.White,
+                        ForeColor = foregroundColor,
                         MaxLength = 1,
                         TextAlign = HorizontalAlignment.Center,
                         Name = $"{row.index},{cell.index}",
@@ -451,19 +451,26 @@ namespace KenKenPlayer
                     int textBoxYCoord = yCoord + (cellSize / 2) - (newTextBox.Size.Height / 2);
                     newTextBox.Location = new Point(textBoxXCoord, textBoxYCoord);
 
-                    Label newLabel = new Label
+                    int richTextBoxWidth = (int)(cellSize * 0.90);
+                    int richTextBoxHeight = 20;
+                    int richTextBoxXCoord = xCoord + ((cellSize - richTextBoxWidth) / 2);
+                    int richTextBoxYCoord = yCoord + cellSize - (int)(richTextBoxHeight * 1.2);
+
+                    RichTextBox newRichTextBox = new RichTextBox
                     {
-                        BackColor = Color.Transparent,
-                        Font = notesLabelFont,
-                        ForeColor = Color.White,
-                        TextAlign = ContentAlignment.BottomCenter,
-                        Size = new Size(cellSize, cellSize),
-                        Location = new Point(xCoord, yCoord)
+                        BackColor = puzzleBackgroundColor,
+                        ForeColor = foregroundColor,
+                        Size = new Size(richTextBoxWidth, richTextBoxHeight),
+                        Location = new Point(richTextBoxXCoord, richTextBoxYCoord),
+                        Multiline = false,
+                        BorderStyle = BorderStyle.None,
+                        ReadOnly = true,
+                        TabStop = false
                     };
-                    ((TextBoxTagData)newTextBox.Tag).notesLabel = newLabel;
+                    ((TextBoxTagData)newTextBox.Tag).notesPreview = newRichTextBox;
 
                     Controls.Add(newTextBox);
-                    Controls.Add(newLabel);
+                    Controls.Add(newRichTextBox);
                     cell.cell.textBox = newTextBox;
                 }
             }
@@ -475,13 +482,15 @@ namespace KenKenPlayer
             {
                 ((TextBox)sender).Text = string.Empty;
             }
+
+            ClearAllCellHighlighting();
         }
 
         private void CellTextBox_GotFocus(object sender, EventArgs e)
         {
             focusedTextBox = (TextBox)sender;
             NotesTextBox.ReadOnly = false;
-            NotesTextBox.Text = ((TextBoxTagData)focusedTextBox.Tag).notes;
+            NotesTextBox.Rtf = ((TextBoxTagData)focusedTextBox.Tag).notes;
             focusedTextBox.SelectAll();
         }
 
@@ -502,10 +511,7 @@ namespace KenKenPlayer
             }
 
             // Clear the highlighting from the rows.
-            foreach (var row in cageAssignments)
-            {
-                HighlightCells(row, false);
-            }
+            ClearAllCellHighlighting();
 
             // First, validate the rows.
             foreach (var row in cageAssignments.Select((row, index) => (row, index)))
@@ -658,6 +664,14 @@ namespace KenKenPlayer
             return result;
         }
 
+        private void ClearAllCellHighlighting()
+        {
+            foreach (var row in cageAssignments)
+            {
+                HighlightCells(row, false);
+            }
+        }
+
         private void HighlightRow(int rowIndex, bool column, bool highlight)
         {
             var cages = cageAssignments;
@@ -703,16 +717,36 @@ namespace KenKenPlayer
 
         private void NotesTextBox_TextChanged(object sender, EventArgs e)
         {
-            ((TextBoxTagData)focusedTextBox.Tag).notes = NotesTextBox.Text;
-            ((TextBoxTagData)focusedTextBox.Tag).notesLabel.Text = NotesTextBox.Text;
+            TextBoxTagData tagData = (TextBoxTagData)focusedTextBox.Tag;
+            tagData.notes = NotesTextBox.Rtf;
+            tagData.notesPreview.Rtf = NotesTextBox.Rtf;
+            tagData.notesPreview.SelectAll();
+            tagData.notesPreview.SelectionColor = foregroundColor;
+            tagData.notesPreview.SelectionAlignment = HorizontalAlignment.Center;
         }
 
         private void NotesTextBox_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Control && e.KeyCode == Keys.N)
+            var fontStyleShortcuts = new Dictionary<Keys, FontStyle>
             {
-                e.SuppressKeyPress = true;
-                focusedTextBox.Focus();
+                { Keys.B, FontStyle.Bold },
+                { Keys.I, FontStyle.Italic },
+                { Keys.U, FontStyle.Underline },
+                { Keys.K, FontStyle.Strikeout }
+            };
+
+            if (e.Control)
+            {
+                if (e.KeyCode == Keys.N)
+                {
+                    e.SuppressKeyPress = true;
+                    focusedTextBox.Focus();
+                }
+                else if (fontStyleShortcuts.ContainsKey(e.KeyCode))
+                {
+                    e.SuppressKeyPress = true;
+                    NotesTextBox.SelectionFont = new Font(NotesTextBox.SelectionFont, NotesTextBox.SelectionFont.Style ^ fontStyleShortcuts[e.KeyCode]);
+                }
             }
         }
     }
@@ -767,6 +801,6 @@ namespace KenKenPlayer
     public class TextBoxTagData
     {
         public string notes;
-        public Label notesLabel;
+        public RichTextBox notesPreview;
     }
 }

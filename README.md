@@ -8,7 +8,7 @@ It supports common sizes of puzzles, like 4x4, 5x5, and 6x6. It may work with la
 
 No-op puzzles are not supported. The puzzles must have operations for each cage, unless a cage only has a single cell.
 
-You can take notes using the text box at the top of the window and they'll be displayed at the bottom of the cell that's currently in focus.
+You can take notes using the text box at the top of the window and they'll be displayed at the bottom of the cell that's currently in focus. You can use bold, italics, underlines, and strikethroughs in your notes to organize them, like to strike out eliminated candidate numbers. See the keyboard shortcuts section to learn how to apply the styles.
 
 ![Notes](screenshots/notes.png "Demonstration of how notes can be entered using the text box at the top of the window and displayed at the bottom of the associated cell")
 
@@ -70,3 +70,11 @@ Once you've loaded a puzzle by dragging a text file into the program, you can pl
 `Enter` is the same as pressing the `Check` button, allowing you to check your work from anywhere in the puzzle.
 
 `Ctrl-N` moves between the currently focused cell and the notes text box, and vice versa.
+
+`Ctrl-B` in the notes text box toggles the bold style on the currently selected text.
+
+`Ctrl-I` in the notes text box toggles the italics style on the currently selected text.
+
+`Ctrl-U` in the notes text box toggles the underline style on the currently selected text.
+
+`Ctrl-K` in the notes text box toggles the strikethrough style on the currently selected text.

@@ -17,27 +17,36 @@ namespace KenKenPlayer
             InitializeComponent();
         }
 
-        private int gridSize;                                   // Number of cells in each row and column.
-        private List<List<Cell>> cageAssignments = new List<List<Cell>>();
-        private List<Cage> cageEntries = new List<Cage>();
-        private int cellSize = 125;                             // Determines how big each cell is. Visible size will be less because of the width of the border and grid lines.
-        private Color borderColor = Color.Gray;                 // Color used for the outer border lines and heavy cage lines.
-        private Color gridColor = Color.Gray;                   // Color used for the grid lines.
-        private int topLeftCoord = 54;                          // Offset from the top-left corner of the canvas.
-        private int bottomRightCoord;                           // Counterpart to topLeftCoord. Not known until the grid size is known.
-        private int borderWidth = 5;                            // Width of the outer border lines and heavy cage lines.
-        private int gridWidth = 1;                              // Width of the grid lines.
-        private Color puzzleBackgroundColor = Color.Black;      // Background color of the puzzle canvas.
-        private Color foregroundColor = Color.White;            // Color used for most text elements.
-        private Font cornerTextFont = new Font("Arial", 20);    // Font used for the corner text with the result and operation.
-        private Brush cornerTextColor = Brushes.White;          // Color used for the corner text.
-        private Bitmap puzzleCanvas;                            // Bitmap for the puzzle canvas.
-        private Regex cageRegex = new Regex(@"(?<index>[\dA-F]+):\s+(?<result>\d+)\s*(?<operation>[+\-/x*_])?", RegexOptions.IgnoreCase);
-        private Font textBoxFont = new Font("Arial", 36);       // Font used for the cell textboxes.
-        private Color textBoxIncorrectColor = Color.Red;        // Color used to show incorrect cells.
-        private TextBox focusedTextBox;                         // Used to track the currently focused textbox so the notes textbox knows where to store its text.
-        private DateTime startTime;                             // Records the time at which the puzzle has finished loading from the text file and was rendered in the program.
-        private bool puzzleCompleted;                           // Indicates whether the puzzle has been completed yet or not. Used for displaying the completion time in the title bar.
+        private int gridSize;                                           // Number of cells in each row and column.
+        private readonly List<List<Cell>> cageAssignments = [];         // Maps puzzle cells to cages.
+        private readonly List<Cage> cageEntries = [];                   // Cages contain a result and an operation.
+        private readonly int cellSize = 125;                            // Determines how big each cell is. Visible size will be less because of the width of the border and grid lines.
+
+        private readonly Color borderColor = Color.Gray;                // Color used for the outer border lines and heavy cage lines.
+        private readonly Color gridColor = Color.Gray;                  // Color used for the grid lines.
+
+        private readonly int topLeftCoord = 54;                         // Offset from the top-left corner of the canvas.
+        private int bottomRightCoord;                                   // Counterpart to topLeftCoord. Not known until the grid size is known.
+        private readonly int borderWidth = 5;                           // Width of the outer border lines and heavy cage lines.
+        private readonly int gridWidth = 1;                             // Width of the grid lines.
+
+        private readonly Color puzzleBackgroundColor = Color.Black;     // Background color of the puzzle canvas.
+        private readonly Color foregroundColor = Color.White;           // Color used for most text elements.
+
+        private readonly Font cornerTextFont = new("Arial", 20);        // Font used for the corner text with the result and operation.
+        private readonly Brush cornerTextColor = Brushes.White;         // Color used for the corner text.
+
+        private Bitmap puzzleCanvas;                                    // Bitmap for the puzzle canvas.
+
+        private readonly Regex cageRegex = new(@"(?<index>[\dA-F]+):\s+(?<result>\d+)\s*(?<operation>[+\-/x*_])?", RegexOptions.IgnoreCase);
+
+        private readonly Font textBoxFont = new("Arial", 36);           // Font used for the cell textboxes.
+        private readonly Color textBoxIncorrectColor = Color.Red;       // Color used to show incorrect cells.
+
+        private TextBox focusedTextBox;                                 // Used to track the currently focused textbox so the notes textbox knows where to store its text.
+
+        private DateTime startTime;                                     // Records the time at which the puzzle has finished loading from the text file and was rendered in the program.
+        private bool puzzleCompleted;                                   // Indicates whether the puzzle has been completed yet or not. Used for displaying the completion time in the title bar.
 
         private void KenKenPlayer_DragEnter(object sender, DragEventArgs e)
         {
@@ -168,7 +177,7 @@ namespace KenKenPlayer
             // Now read that many lines from the file and split each line on commas to get the cage assignments for each row.
             foreach (var rowString in fileData.Take(gridSize))
             {
-                List<Cell> cells = new List<Cell>();
+                List<Cell> cells = [];
 
                 int cageAssignment = 0;
                 foreach (var parseSuccess in rowString.Split(',').Select(cageIndexString => int.TryParse(cageIndexString.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out cageAssignment)))
@@ -179,7 +188,7 @@ namespace KenKenPlayer
                         throw new FormatException($"Could not parse '{rowString}' as {gridSize} numbers. Please check the text file.");
                     }
 
-                    Cell newCell = new Cell { cageIndex = cageAssignment };
+                    Cell newCell = new() { cageIndex = cageAssignment };
                     cells.Add(newCell);
                 }
 
@@ -224,27 +233,14 @@ namespace KenKenPlayer
                 cage.result = result;
 
                 // Handle the operation.
-                switch (match.Groups["operation"].Value.ToLower())
+                cage.operation = match.Groups["operation"].Value.ToLower() switch
                 {
-                    case "+":
-                        cage.operation = CageOperation.Addition;
-                        break;
-                    case "-":
-                        cage.operation = CageOperation.Subtraction;
-                        break;
-                    case "x":
-                    case "*":
-                        cage.operation = CageOperation.Multiplication;
-                        break;
-                    case "/":
-                        cage.operation = CageOperation.Division;
-                        break;
-                    case "_":
-                    default:
-                        cage.operation = CageOperation.NoOperation;
-                        break;
-                }
-
+                    "+" => CageOperation.Addition,
+                    "-" => CageOperation.Subtraction,
+                    "x" or "*" => CageOperation.Multiplication,
+                    "/" => CageOperation.Division,
+                    _ => CageOperation.NoOperation,
+                };
                 cageEntries.Add(cage);
             }
         }
@@ -252,14 +248,14 @@ namespace KenKenPlayer
         private bool CrossCheckCages()
         {
             HashSet<int> cageAssignmentIndices = GetCageIndices();
-            HashSet<int> cageEntryIndices = new HashSet<int>(cageEntries.Select(entry => entry.index));
+            HashSet<int> cageEntryIndices = new(cageEntries.Select(entry => entry.index));
 
             return cageAssignmentIndices.SetEquals(cageEntryIndices);
         }
 
         private HashSet<int> GetCageIndices()
         {
-            HashSet<int> cageAssignmentIndices = new HashSet<int>();
+            HashSet<int> cageAssignmentIndices = [];
 
             foreach (var row in cageAssignments)
             {
@@ -274,15 +270,13 @@ namespace KenKenPlayer
 
         private void DrawGridLines()
         {
-            using (Pen gridPen = new Pen(gridColor, gridWidth))
-            using (Graphics gr = Graphics.FromImage(puzzleCanvas))
+            using Pen gridPen = new(gridColor, gridWidth);
+            using Graphics gr = Graphics.FromImage(puzzleCanvas);
+            foreach (int cellIndex in Enumerable.Range(1, gridSize - 1))
             {
-                foreach (int cellIndex in Enumerable.Range(1, gridSize - 1))
-                {
-                    int coord = cellIndex * cellSize + topLeftCoord;
-                    gr.DrawLine(gridPen, coord, topLeftCoord, coord, bottomRightCoord);
-                    gr.DrawLine(gridPen, topLeftCoord, coord, bottomRightCoord, coord);
-                }
+                int coord = cellIndex * cellSize + topLeftCoord;
+                gr.DrawLine(gridPen, coord, topLeftCoord, coord, bottomRightCoord);
+                gr.DrawLine(gridPen, topLeftCoord, coord, bottomRightCoord, coord);
             }
         }
 
@@ -292,7 +286,7 @@ namespace KenKenPlayer
 
             foreach (int cellIndex in Enumerable.Range(0, puzzleGrid[0].Count))
             {
-                List<Cell> newColumn = new List<Cell>();
+                List<Cell> newColumn = [];
 
                 foreach (List<Cell> row in puzzleGrid)
                 {
@@ -311,7 +305,7 @@ namespace KenKenPlayer
 
             foreach (List<Cell> row in puzzleGrid)
             {
-                List<bool> borders = new List<bool>();
+                List<bool> borders = [];
 
                 foreach (int cellIndex in Enumerable.Range(0, row.Count - 1))
                 {
@@ -327,11 +321,29 @@ namespace KenKenPlayer
 
         private void DrawHeavyBorders(List<List<bool>> heavyCageBorders, bool horizontal)
         {
+            // Draw the borders slightly beyond the grid line to ensure that intersecting borders overlap and make clean corners.
+            int lineOverlap = (borderWidth - gridWidth) / 2;
+
+            // Extra offset to make sure that the borders align for both even and odd grid line widths.
+            int coord1Offset = lineOverlap;
+            int coord2Offset = lineOverlap;
+
+            if (gridWidth % 2 == 0)
+            {
+                coord1Offset += gridWidth / 2;
+                coord2Offset += gridWidth / 2;
+            }
+            else
+            {
+                coord1Offset += (gridWidth + 1) / 2 - 1;
+                coord2Offset += (gridWidth + 1) / 2;
+            }
+
             foreach ((List<bool> borders, int outerIndex) in heavyCageBorders.Select((item, index) => (item, index)))
             {
                 // Since everything's a square, these two coordinates can either be on the X or Y axis, representing the left/right edges or the top/bottom edges of the cell.
-                int outerCoord1 = outerIndex * cellSize + topLeftCoord;
-                int outerCoord2 = (outerIndex + 1) * cellSize + topLeftCoord;
+                int outerCoord1 = outerIndex * cellSize + topLeftCoord - coord1Offset;
+                int outerCoord2 = (outerIndex + 1) * cellSize + topLeftCoord + coord2Offset;
 
                 foreach ((bool borderPresent, int innerIndex) in borders.Select((item, index) => (item, index)))
                 {
@@ -340,17 +352,15 @@ namespace KenKenPlayer
 
                     if (borderPresent)
                     {
-                        using (Pen borderPen = new Pen(borderColor, borderWidth))
-                        using (Graphics gr = Graphics.FromImage(puzzleCanvas))
+                        using Pen borderPen = new(borderColor, borderWidth);
+                        using Graphics gr = Graphics.FromImage(puzzleCanvas);
+                        if (horizontal)
                         {
-                            if (horizontal)
-                            {
-                                gr.DrawLine(borderPen, outerCoord1, innerCoord, outerCoord2, innerCoord);
-                            }
-                            else
-                            {
-                                gr.DrawLine(borderPen, innerCoord, outerCoord1, innerCoord, outerCoord2);
-                            }
+                            gr.DrawLine(borderPen, outerCoord1, innerCoord, outerCoord2, innerCoord);
+                        }
+                        else
+                        {
+                            gr.DrawLine(borderPen, innerCoord, outerCoord1, innerCoord, outerCoord2);
                         }
                     }
                 }
@@ -383,13 +393,11 @@ namespace KenKenPlayer
 
                 // Calculate the coordinates for the cell.
                 (int topLeftXCoord, int topLeftYCoord) = GetCellCoordinates(row, cell);
-                Rectangle cellRectangle = new Rectangle(topLeftXCoord, topLeftYCoord, cellSize, cellSize);
+                Rectangle cellRectangle = new(topLeftXCoord, topLeftYCoord, cellSize, cellSize);
 
                 // Draw the corner text in the corner of the cell.
-                using (Graphics gr = Graphics.FromImage(puzzleCanvas))
-                {
-                    gr.DrawString(cage.ToString(), cornerTextFont, cornerTextColor, cellRectangle);
-                }
+                using Graphics gr = Graphics.FromImage(puzzleCanvas);
+                gr.DrawString(cage.ToString(), cornerTextFont, cornerTextColor, cellRectangle);
             }
         }
 
@@ -402,11 +410,9 @@ namespace KenKenPlayer
         {
             Rectangle outerBorderRectangle = Rectangle.FromLTRB(topLeftCoord, topLeftCoord, bottomRightCoord, bottomRightCoord);
 
-            using (Pen borderPen = new Pen(borderColor, borderWidth))
-            using (Graphics gr = Graphics.FromImage(puzzleCanvas))
-            {
-                gr.DrawRectangle(borderPen, outerBorderRectangle);
-            }
+            using Pen borderPen = new(borderColor, borderWidth);
+            using Graphics gr = Graphics.FromImage(puzzleCanvas);
+            gr.DrawRectangle(borderPen, outerBorderRectangle);
         }
 
         private void RemoveExistingCellTextBoxes()
@@ -431,7 +437,7 @@ namespace KenKenPlayer
                 {
                     (int xCoord, int yCoord) = GetCellCoordinates(row.index, cell.index);
 
-                    TextBox newTextBox = new TextBox
+                    TextBox newTextBox = new()
                     {
                         BackColor = puzzleBackgroundColor,
                         BorderStyle = BorderStyle.None,
@@ -456,7 +462,7 @@ namespace KenKenPlayer
                     int richTextBoxXCoord = xCoord + ((cellSize - richTextBoxWidth) / 2);
                     int richTextBoxYCoord = yCoord + cellSize - (int)(richTextBoxHeight * 1.2);
 
-                    RichTextBox newRichTextBox = new RichTextBox
+                    RichTextBox newRichTextBox = new()
                     {
                         BackColor = puzzleBackgroundColor,
                         ForeColor = foregroundColor,
@@ -545,7 +551,7 @@ namespace KenKenPlayer
                     }
                     else
                     {
-                        cagesWithCells[cell.cageIndex] = new List<Cell> { cell };
+                        cagesWithCells[cell.cageIndex] = [cell];
                     }
                 }
             }
@@ -584,7 +590,7 @@ namespace KenKenPlayer
             int maxNumber = row.Count;
 
             // Gather the numbers from the row to make things a bit easier later. In this case, that means getting the text from the textboxes and parsing it into ints.
-            List<int> rowNumbers = new List<int>();
+            List<int> rowNumbers = [];
             foreach (var cell in row)
             {
                 // If the textbox is empty, return false immediately. It's obviously not going to validate.
@@ -611,7 +617,7 @@ namespace KenKenPlayer
             int result = 0;
 
             // Gather the numbers from the row and parse them into ints once again.
-            List<int> numbers = new List<int>();
+            List<int> numbers = [];
             foreach (var cell in cells)
             {
                 // If the textbox is empty, return -1 immediately. It's obviously not going to validate.

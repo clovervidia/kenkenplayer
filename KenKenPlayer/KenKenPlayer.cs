@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -22,6 +23,8 @@ namespace KenKenPlayer
         private readonly List<Cage> cageEntries = [];                   // Cages contain a result and an operation.
         private readonly int cellSize = 125;                            // Determines how big each cell is. Visible size will be less because of the width of the border and grid lines.
 
+        private readonly List<List<SavedCell>> saveState = [];          // Simplified copy of cageAssignments to use for save states.
+
         private readonly Color borderColor = Color.Gray;                // Color used for the outer border lines and heavy cage lines.
         private readonly Color gridColor = Color.Gray;                  // Color used for the grid lines.
 
@@ -42,10 +45,11 @@ namespace KenKenPlayer
 
         private readonly Font textBoxFont = new("Arial", 36);           // Font used for the cell textboxes.
         private readonly Color textBoxIncorrectColor = Color.Red;       // Color used to show incorrect cells.
+        private readonly Color textBoxHighlightColor = Color.RoyalBlue; // Color used to highlight the active cell when editing notes.
 
         private TextBox focusedTextBox;                                 // Used to track the currently focused textbox so the notes textbox knows where to store its text.
 
-        private DateTime startTime;                                     // Records the time at which the puzzle has finished loading from the text file and was rendered in the program.
+        private readonly Stopwatch stopwatch = new();                   // Used to track the amount of time taken to solve the puzzle.
         private bool puzzleCompleted;                                   // Indicates whether the puzzle has been completed yet or not. Used for displaying the completion time in the title bar.
 
         private void KenKenPlayer_DragEnter(object sender, DragEventArgs e)
@@ -71,13 +75,19 @@ namespace KenKenPlayer
                 return;
             }
 
-            // Disable the Check button and Notes textbox when file parsing starts. They'll be enabled later if everything goes well.
+            // Disable the buttons and Notes textbox when file parsing starts. They'll be enabled later if everything goes well.
             CheckButton.Enabled = false;
-            NotesTextBox.ReadOnly = true;
+            NotesTextBox.Enabled = false;
             NotesTextBox.Text = string.Empty;
+            SaveStateButton.Enabled = false;
+            LoadStateButton.Enabled = false;
+            PauseButton.Enabled = false;
+            PauseButton.Text = "&Pause";
+            ResetButton.Enabled = false;
 
             // Clear the background image and display the instructions label in case parsing fails.
             BackgroundImage = null;
+            InstructionsLabel.Text = "Drag a .txt file here to begin!";
             InstructionsLabel.Visible = true;
 
             // Remove any existing textboxes before adding new ones.
@@ -86,6 +96,7 @@ namespace KenKenPlayer
             // Once the textboxes have been removed, it's safe to clear out the old cage assignments and entries.
             cageAssignments.Clear();
             cageEntries.Clear();
+            saveState.Clear();
 
             // Read the provided .txt file and attempt to parse its data into cage assignments and cage entries.
             try
@@ -107,6 +118,7 @@ namespace KenKenPlayer
 
             // If the puzzle file has been parsed successfully, everything should be fine. Hide the instructions label now.
             InstructionsLabel.Visible = false;
+            InstructionsLabel.Text = "Press 'Resume' to continue playing!";
 
             // With the puzzle size known, prepare the canvas for drawing operations.
             puzzleCanvas = new Bitmap((gridSize + 1) * cellSize, (gridSize + 1) * cellSize);
@@ -140,11 +152,15 @@ namespace KenKenPlayer
             // Make new textboxes for each cell.
             CreateNewCellTextBoxes();
 
-            // Enable the Check button.
+            // Enable the buttons.
             CheckButton.Enabled = true;
+            SaveStateButton.Enabled = true;
+            LoadStateButton.Enabled = true;
+            PauseButton.Enabled = true;
+            ResetButton.Enabled = true;
 
-            // Record the start time.
-            startTime = DateTime.Now;
+            // Start the clock.
+            stopwatch.Restart();
             puzzleCompleted = false;
 
             // Set the focus to the first cell.
@@ -248,7 +264,7 @@ namespace KenKenPlayer
         private bool CrossCheckCages()
         {
             HashSet<int> cageAssignmentIndices = GetCageIndices();
-            HashSet<int> cageEntryIndices = new(cageEntries.Select(entry => entry.index));
+            HashSet<int> cageEntryIndices = [.. cageEntries.Select(entry => entry.index)];
 
             return cageAssignmentIndices.SetEquals(cageEntryIndices);
         }
@@ -424,7 +440,9 @@ namespace KenKenPlayer
                 textBox.GotFocus -= CellTextBox_GotFocus;
                 textBox.KeyDown -= CellTextBox_KeyDown;
                 Controls.Remove(textBox);
-                Controls.Remove(((TextBoxTagData)textBox.Tag).notesPreview);
+                TextBoxTagData tagData = ((TextBoxTagData)textBox.Tag);
+                tagData.notesPreview.GotFocus -= NotesPreview_GotFocus;
+                Controls.Remove(tagData.notesPreview);
                 textBox.Dispose();
             }
         }
@@ -471,8 +489,11 @@ namespace KenKenPlayer
                         Multiline = false,
                         BorderStyle = BorderStyle.None,
                         ReadOnly = true,
-                        TabStop = false
+                        TabStop = false,
+                        Tag = (row.index, cell.index),
                     };
+                    newRichTextBox.GotFocus += NotesPreview_GotFocus;
+                    newRichTextBox.TextChanged += NotesPreview_TextChanged;
                     ((TextBoxTagData)newTextBox.Tag).notesPreview = newRichTextBox;
 
                     Controls.Add(newTextBox);
@@ -495,9 +516,10 @@ namespace KenKenPlayer
         private void CellTextBox_GotFocus(object sender, EventArgs e)
         {
             focusedTextBox = (TextBox)sender;
-            NotesTextBox.ReadOnly = false;
+            NotesTextBox.Enabled = true;
             NotesTextBox.Rtf = ((TextBoxTagData)focusedTextBox.Tag).notes;
             focusedTextBox.SelectAll();
+            ClearAllCellHighlighting();
         }
 
         private void CellTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -507,6 +529,22 @@ namespace KenKenPlayer
                 e.SuppressKeyPress = true;
                 NotesTextBox.Focus();
             }
+        }
+
+        private void NotesPreview_GotFocus(object sender, EventArgs e)
+        {
+            var notesPreview = (RichTextBox)sender;
+            (int row, int column) = (ValueTuple<int, int>)notesPreview.Tag;
+            cageAssignments[row][column].textBox.Focus();
+            NotesTextBox.Focus();
+        }
+
+        private void NotesPreview_TextChanged(object sender, EventArgs e)
+        {
+            RichTextBox notesPreview = (RichTextBox)sender;
+            notesPreview.SelectAll();
+            notesPreview.SelectionColor = foregroundColor;
+            notesPreview.SelectionAlignment = HorizontalAlignment.Center;
         }
 
         private void CheckButton_Click(object sender, EventArgs e)
@@ -579,8 +617,14 @@ namespace KenKenPlayer
                 if (!puzzleCompleted)
                 {
                     puzzleCompleted = true;
-                    Text += $" {DateTime.Now - startTime}";
+                    stopwatch.Stop();
+                    Text += $" {stopwatch.Elapsed}";
                 }
+
+                SaveStateButton.Enabled = false;
+                LoadStateButton.Enabled = false;
+                PauseButton.Enabled = false;
+                ResetButton.Enabled = false;
             }
         }
 
@@ -642,7 +686,7 @@ namespace KenKenPlayer
                     numbers.Sort();
                     numbers.Reverse();
                     result = numbers[0];
-                    numbers = numbers.Skip(1).ToList();
+                    numbers = [.. numbers.Skip(1)];
                     break;
                 case CageOperation.NoOperation:
                     return numbers[0];
@@ -726,9 +770,6 @@ namespace KenKenPlayer
             TextBoxTagData tagData = (TextBoxTagData)focusedTextBox.Tag;
             tagData.notes = NotesTextBox.Rtf;
             tagData.notesPreview.Rtf = NotesTextBox.Rtf;
-            tagData.notesPreview.SelectAll();
-            tagData.notesPreview.SelectionColor = foregroundColor;
-            tagData.notesPreview.SelectionAlignment = HorizontalAlignment.Center;
         }
 
         private void NotesTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -753,6 +794,144 @@ namespace KenKenPlayer
                     e.SuppressKeyPress = true;
                     NotesTextBox.SelectionFont = new Font(NotesTextBox.SelectionFont, NotesTextBox.SelectionFont.Style ^ fontStyleShortcuts[e.KeyCode]);
                 }
+            }
+        }
+
+        private void NotesTextBox_Enter(object sender, EventArgs e)
+        {
+            NotesTextBox.Select(NotesTextBox.TextLength, 0);
+
+            ClearAllCellHighlighting();
+            focusedTextBox.BackColor = textBoxHighlightColor;
+        }
+
+        private void ResetButton_Click(object sender, EventArgs e)
+        {
+            if (!cageAssignments.Any())
+            {
+                return;
+            }
+
+            var result = MessageBox.Show("Are you sure you want to reset this puzzle?", "Reset puzzle?", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (var row in cageAssignments)
+            {
+                foreach (var cell in row)
+                {
+                    cell.textBox.Text = "";
+                    TextBoxTagData tagData = (TextBoxTagData)cell.textBox.Tag;
+                    tagData.notes = "";
+                    tagData.notesPreview.Text = "";
+                    NotesTextBox.Text = "";
+                }
+            }
+
+            ClearAllCellHighlighting();
+
+            cageAssignments[0][0].textBox.Focus();
+        }
+
+        private void SaveStateButton_Click(object sender, EventArgs e)
+        {
+            saveState.Clear();
+
+            foreach (var row in cageAssignments)
+            {
+                var savedRow = new List<SavedCell>();
+
+                foreach (var cell in row)
+                {
+                    var savedCell = new SavedCell
+                    {
+                        value = cell.textBox.Text,
+                        notes = ((TextBoxTagData)cell.textBox.Tag).notes
+                    };
+
+                    savedRow.Add(savedCell);
+                }
+
+                saveState.Add(savedRow);
+            }
+        }
+
+        private void LoadStateButton_Click(object sender, EventArgs e)
+        {
+            if (!saveState.Any())
+            {
+                return;
+            }
+
+            foreach (var row in cageAssignments.Zip(saveState, (grid, saved) => (grid, saved)))
+            {
+                foreach (var cell in row.grid.Zip(row.saved, (grid, saved) => (grid, saved)))
+                {
+                    cell.grid.textBox.Text = cell.saved.value;
+                    TextBoxTagData tag = (TextBoxTagData)cell.grid.textBox.Tag;
+                    tag.notes = cell.saved.notes;
+                    tag.notesPreview.Rtf = cell.saved.notes;
+                    cell.grid.textBox.Focus();
+                }
+            }
+
+            cageAssignments[0][0].textBox.Focus();
+        }
+
+        private void PauseButton_Click(object sender, EventArgs e)
+        {
+            if (!cageAssignments.Any())
+            {
+                return;
+            }
+
+            if (stopwatch.IsRunning)
+            {
+                stopwatch.Stop();
+
+                CheckButton.Enabled = false;
+                NotesTextBox.Enabled = false;
+                SaveStateButton.Enabled = false;
+                LoadStateButton.Enabled = false;
+                PauseButton.Text = "&Resume";
+                ResetButton.Enabled = false;
+
+                foreach (var row in cageAssignments)
+                {
+                    foreach (var cell in row)
+                    {
+                        cell.textBox.Enabled = false;
+                        ((TextBoxTagData)cell.textBox.Tag).notesPreview.Enabled = false;
+                    }
+                }
+
+                InstructionsLabel.Visible = true;
+
+                PauseButton.Focus();
+            }
+            else
+            {
+                CheckButton.Enabled = true;
+                NotesTextBox.Enabled = true;
+                SaveStateButton.Enabled = true;
+                LoadStateButton.Enabled = true;
+                PauseButton.Text = "&Pause";
+                ResetButton.Enabled = true;
+
+                foreach (var row in cageAssignments)
+                {
+                    foreach (var cell in row)
+                    {
+                        cell.textBox.Enabled = true;
+                        ((TextBoxTagData)cell.textBox.Tag).notesPreview.Enabled = true;
+                    }
+                }
+
+                InstructionsLabel.Visible = false;
+
+                stopwatch.Start();
             }
         }
     }
@@ -808,5 +987,11 @@ namespace KenKenPlayer
     {
         public string notes;
         public RichTextBox notesPreview;
+    }
+
+    public class SavedCell
+    {
+        public string value;
+        public string notes;
     }
 }

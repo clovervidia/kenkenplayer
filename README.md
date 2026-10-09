@@ -8,15 +8,27 @@ It supports common sizes of puzzles, like 4x4, 5x5, and 6x6. It may work with la
 
 No-op puzzles are not supported. The puzzles must have operations for each cage, unless a cage only has a single cell.
 
-You can take notes using the text box at the top of the window and they'll be displayed at the bottom of the cell that's currently in focus. You can use bold, italics, underlines, and strikethroughs in your notes to organize them, like to strike out eliminated candidate numbers. See the keyboard shortcuts section to learn how to apply the styles.
+You can take notes using the text box at the top of the window and they'll be displayed at the bottom of the cell that's currently in focus, which is indicated by a blue background. You can use bold, italics, underlines, and strikethroughs in your notes to organize them, like to strike out eliminated candidate numbers. See the keyboard shortcuts section to learn how to apply the styles.
 
 ![Notes](screenshots/notes.png "Demonstration of how notes can be entered using the text box at the top of the window and displayed at the bottom of the associated cell")
+
+To edit a cell's notes, you can either focus the cell and then click the text box at the top of the window, or just click near the bottom of the cell.
+
+![Edit Notes](screenshots/editnotes.png "Click near the bottom of the cell to edit the notes for that cell")
 
 Clicking the `Check` button will check the puzzle. It first checks the rows and columns to make sure that the appropriate numbers are present in each, and then it checks each cage to see if the calculated result matches the expected one. If anything is amiss, the cells in question will be highlighted in red. Otherwise, if everything checks out, the cells will all be highlighted green and your puzzle time will appear in the title bar.
 
 ![Cell Highlighting](screenshots/checkhighlighting.png "Main UI with first row highlighted in red as there are more than one instance of the number 1")
 
 You can adjust the colors, fonts, dimensions, and other aspects of how the puzzles are rendered at the top of [`KenKenPlayer.cs`](KenKenPlayer/KenKenPlayer.cs).
+
+The `Save` button allows you to save the current state of the puzzle as a checkpoint that can later be reloaded with the `Load` button. There's only one checkpoint slot available.
+
+If you need to pause the puzzle, click `Pause`, and the timer will be paused. Once you're ready to continue, click `Resume`.
+
+![Paused Game](screenshots/paused.png "Paused game, showing the Resume button")
+
+The `Reset` button will clear all numbers and notes from the puzzle and reset it to its initial state. It does not restart the timer, however.
 
 ## Puzzle Text File
 
@@ -45,13 +57,13 @@ The lines after the cage assignments contain the cage entries, which map operati
 
 Here are the supported characters for each operation. They should be self-explanatory.
 
-|Operation|Characters|
-|:--|:--|
-|Addition|`+`|
-|Subtraction|`-`|
+|Operation     |Characters|
+|:-------------|:---------|
+|Addition      |`+`       |
+|Subtraction   |`-`       |
 |Multiplication|`x` or `*`|
-|Division|`/`|
-|None|`_`|
+|Division      |`/`       |
+|None          |`_`       |
 
 For no-op cages, you can also just drop the operation character and end the line with the result, like so:
 
@@ -78,3 +90,14 @@ Once you've loaded a puzzle by dragging a text file into the program, you can pl
 `Ctrl-U` in the notes text box toggles the underline style on the currently selected text.
 
 `Ctrl-K` in the notes text box toggles the strikethrough style on the currently selected text.
+
+The buttons in the top bar all have keyboard accelerators assigned to them as follows:
+
+|Button|Accelerator|
+|:-----|:----------|
+|Check |`Alt`-`C`  |
+|Save  |`Alt`-`S`  |
+|Load  |`Alt`-`L`  |
+|Pause |`Alt`-`P`  |
+|Resume|`Alt`-`R`  |
+|Reset |`Alt`-`R`  |
